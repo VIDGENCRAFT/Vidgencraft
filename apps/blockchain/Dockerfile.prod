@@ -1,0 +1,42 @@
+# Build stage
+FROM node:16-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json yarn.lock ./
+COPY apps/blockchain/package.json ./apps/blockchain/
+COPY contracts ./contracts
+
+# Install dependencies
+RUN yarn install --frozen-lockfile
+
+# Copy source files
+COPY . .
+
+# Build application
+RUN yarn workspace @vidgencraft/blockchain build
+
+# Production stage
+FROM node:16-alpine
+
+WORKDIR /app
+
+# Copy built assets
+COPY --from=builder /app/apps/blockchain/dist ./dist
+COPY --from=builder /app/apps/blockchain/package.json ./package.json
+COPY --from=builder /app/contracts ./contracts
+COPY --from=builder /app/artifacts ./artifacts
+
+# Install production dependencies
+RUN yarn install --production
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=8545
+
+# Expose port
+EXPOSE 8545
+
+# Start the application
+CMD ["yarn", "start"] 

@@ -1,0 +1,45 @@
+# Build stage
+FROM node:16-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json yarn.lock ./
+COPY apps/web/package.json ./apps/web/
+COPY shared/ui/package.json ./shared/ui/
+COPY shared/utils/package.json ./shared/utils/
+
+# Install dependencies
+RUN yarn install --frozen-lockfile
+
+# Copy source files
+COPY . .
+
+# Build applications
+RUN yarn workspace @vidgencraft/ui build
+RUN yarn workspace @vidgencraft/utils build
+RUN yarn workspace @vidgencraft/web build
+
+# Production stage
+FROM node:16-alpine
+
+WORKDIR /app
+
+# Copy built assets
+COPY --from=builder /app/apps/web/.next ./.next
+COPY --from=builder /app/apps/web/public ./public
+COPY --from=builder /app/apps/web/package.json ./package.json
+COPY --from=builder /app/apps/web/next.config.js ./next.config.js
+
+# Install production dependencies
+RUN yarn install --production
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# Expose port
+EXPOSE 3000
+
+# Start the application
+CMD ["yarn", "start"] 
